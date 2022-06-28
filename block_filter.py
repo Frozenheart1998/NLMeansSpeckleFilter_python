@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from math import ceil
 from PIL import Image
 from check_img import check_img
 from get_patch import get_patch
@@ -9,11 +10,12 @@ from SNR import SNR
 
 
 img1 = cv2.imread('images/phantom_noisy.png')
+# img1 = cv2.imread('images/1.png')
 img1 = np.pad(img1, ((6, 6), (0, 0), (0, 0)), 'edge')
 h, w = img1.shape[0], img1.shape[1]
 scale = 0.5
 # img1 = cv2.resize(img1, dsize=(int(scale*h+1), int(scale*w+1)), interpolation=cv2.INTER_CUBIC)
-img1 = np.array(Image.fromarray(img1).resize((int(scale*w+1), int(scale*h+1)), Image.BICUBIC))
+img1 = np.array(Image.fromarray(img1).resize((ceil(scale*w), ceil(scale*h)), Image.BICUBIC))
 img1 = cv2.cvtColor(img1, cv2.COLOR_RGB2GRAY)
 
 search_window = 6  # search window for NL means
