@@ -7,6 +7,7 @@ from get_patch import get_patch
 from get_patch_single import get_patch_single
 from similarity import similarity
 from SNR import SNR
+from true_round import true_round, true_round_matrix
 
 
 img1 = cv2.imread('images/phantom_noisy.png')
@@ -14,7 +15,7 @@ img1 = cv2.imread('images/phantom_noisy.png')
 img1 = np.pad(img1, ((6, 6), (0, 0), (0, 0)), 'edge')
 h, w = img1.shape[0], img1.shape[1]
 scale = 0.5
-# img1 = cv2.resize(img1, dsize=(int(scale*h+1), int(scale*w+1)), interpolation=cv2.INTER_CUBIC)
+# img1 = cv2.resize(img1, dsize=(ceil(scale*w), ceil(scale*h)), interpolation=cv2.INTER_CUBIC)
 img1 = np.array(Image.fromarray(img1).resize((ceil(scale*w), ceil(scale*h)), Image.BICUBIC))
 img1 = cv2.cvtColor(img1, cv2.COLOR_RGB2GRAY)
 
@@ -22,8 +23,8 @@ search_window = 6  # search window for NL means
 patch_size = 3     # patch size for comparison
 epsilon = 1e-13   # to handle 0/0 cases
 
-g_mean = np.mean(img1)  # mean
-g_var = np.var(img1)    # variance
+g_mean = np.mean(img1.astype(np.double))  # mean
+g_var = np.var(img1.astype(np.double))    # variance
 
 filtered_img = np.ones((img1.shape[0], img1.shape[1]))
 
@@ -33,17 +34,17 @@ for i in range(1, img1.shape[0] + 1):
             patch1, patch2, patch3, patch4 = get_patch(img1, i, j, patch_size)
 
             # Mean and Variance of patches
-            mean_patch1 = np.mean(patch1) + epsilon
-            var_patch1 = np.var(patch1) + epsilon
+            mean_patch1 = np.mean(patch1.astype(np.double)) + epsilon
+            var_patch1 = np.var(patch1.astype(np.double), ddof=1) + epsilon
 
-            mean_patch2 = np.mean(patch2) + epsilon
-            var_patch2 = np.var(patch2) + epsilon
+            mean_patch2 = np.mean(patch2.astype(np.double)) + epsilon
+            var_patch2 = np.var(patch2.astype(np.double), ddof=1) + epsilon
 
-            mean_patch3 = np.mean(patch3) + epsilon
-            var_patch3 = np.var(patch3) + epsilon
+            mean_patch3 = np.mean(patch3.astype(np.double)) + epsilon
+            var_patch3 = np.var(patch3.astype(np.double), ddof=1) + epsilon
 
-            mean_patch4 = np.mean(patch4) + epsilon
-            var_patch4 = np.var(patch4) + epsilon
+            mean_patch4 = np.mean(patch4.astype(np.double)) + epsilon
+            var_patch4 = np.var(patch4.astype(np.double), ddof=1) + epsilon
 
             count = 0
             v1 = []
@@ -55,11 +56,11 @@ for i in range(1, img1.shape[0] + 1):
             loc3 = []
             loc4 = []
             # Block wise comparisions with Pearson Distance
-            for x in range(int(1 + i-(search_window-1) / 2), int(1 + i + (search_window - 1) / 2) + 1):
-                for y in range(int(1 + j-(search_window-1) / 2), int(1 + j + (search_window - 1) / 2) + 1):
+            for x in range(true_round(i-(search_window-1) / 2), true_round(i + (search_window - 1) / 2 + 1)):
+                for y in range(true_round(j-(search_window-1) / 2), true_round(j + (search_window - 1) / 2 + 1)):
                     sub_patch = get_patch_single(img1, x, y, patch_size)
-                    mean_sub_patch = np.mean(sub_patch) + epsilon
-                    var_sub_patch = np.var(sub_patch) + epsilon
+                    mean_sub_patch = np.mean(sub_patch.astype(np.double)) + epsilon
+                    var_sub_patch = np.var(sub_patch.astype(np.double)) + epsilon
                     if (g_mean > mean_patch1 / mean_sub_patch > 1 / g_mean) and \
                         (g_var > var_patch1 / var_sub_patch > 1 / g_var):
                         count = count + 1
@@ -109,16 +110,17 @@ for i in range(1, img1.shape[0] + 1):
             v4_sum = np.sum(v4)
             v4 = (v4 + 1e-13) / (v4_sum + 1e-13)
 
-            pixel1 = np.vdot(v1, loc1)
-            pixel2 = np.vdot(v2, loc2)
-            pixel3 = np.vdot(v3, loc3)
-            pixel4 = np.vdot(v4, loc4)
+            pixel1 = np.vdot(v1.astype(np.double), loc1.astype(np.double))
+            pixel2 = np.vdot(v2.astype(np.double), loc2.astype(np.double))
+            pixel3 = np.vdot(v3.astype(np.double), loc3.astype(np.double))
+            pixel4 = np.vdot(v4.astype(np.double), loc4.astype(np.double))
 
             filtered_img[i-1, j-1] = (pixel1 + pixel2 + pixel3 + pixel4) / 4
 
     print("Completed Pixel {} {}".format(i, j))
 
-filtered_img = filtered_img.astype(np.uint8)
+filtered_img = true_round_matrix(filtered_img).astype(np.uint8)
 print("SNR: {}".format(SNR(filtered_img, img1)))
+
 cv2.imshow("NL Means Speckle Filter", filtered_img)
 cv2.waitKey(0)
